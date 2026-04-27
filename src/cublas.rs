@@ -304,7 +304,7 @@ pub fn gemv_f16_op(
 
     Ok(with_context(move |ctx| {
         let launch_status = (|| {
-            ctx.get_cuda_context()
+            ctx.device()
                 .bind_to_thread()
                 .map_err(|e| anyhow!("failed to bind CUDA context: {e:?}"))?;
             let stream = ctx.get_cuda_stream().cu_stream() as cublas_sys::cudaStream_t;
@@ -345,7 +345,7 @@ pub fn gemm_f16_op(
 
     Ok(with_context(move |ctx| {
         let launch_status = (|| {
-            ctx.get_cuda_context()
+            ctx.device()
                 .bind_to_thread()
                 .map_err(|e| anyhow!("failed to bind CUDA context: {e:?}"))?;
             let stream = ctx.get_cuda_stream().cu_stream() as cublas_sys::cudaStream_t;

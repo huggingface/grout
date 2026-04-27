@@ -1,13 +1,6 @@
-mod config;
-mod cublas;
-mod cuda_graph;
-mod kernels;
-mod loader;
-mod model;
-
 use anyhow::Result;
 use clap::Parser;
-use model::Qwen3Engine;
+use grout::model::Qwen3Engine;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]

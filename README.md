@@ -8,11 +8,9 @@ A Qwen 3 inference engine written in Rust, build using [cutile-rs](https://githu
 2) Configure your [environment variables for `cutile-rs`](https://github.com/NVlabs/cutile-rs?tab=readme-ov-file#configure-environment).
 
 - Set `CUDA_TOOLKIT_PATH` to your CUDA 13.2 install directory.
-- Ensure `llvm-config` points to LLVM 21. This is required by `melior`. Or, set `LLVM_SYSPATHXX`. 
-- Set `CUDA_TILE_USE_LLVM_INSTALL_DIR` to your LLVM 21 install directory (for example `/usr/lib/llvm-21`). This is required by `cutile-rs`.
 
 ```
-CUDA_TILE_USE_LLVM_INSTALL_DIR=/usr/lib/llvm-21 cargo +nightly run --release -- --model <path-to-qwen3-model> --prompt "Hello, how are you?" --max-new-tokens 128
+CUDA_TOOLKIT_PATH=/usr/local/cuda-13 cargo run --release -- --model <path-to-qwen3-model> --prompt "Hello, how are you?" --max-new-tokens 128
 ```
 
 ### Options

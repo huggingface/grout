@@ -44,9 +44,7 @@ pub mod kernels {
     use cutile::core::*;
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn gemm_f16<const BM: i32, const BN: i32, const BK: i32, const K: i32>(
         z: &mut Tensor<f16, { [BM, BN] }>,
         x: &Tensor<f16, { [-1, K] }>,
@@ -69,23 +67,19 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn add_vec_f16<const S: [i32; 1]>(
         out: &mut Tensor<f16, S>,
         lhs: &Tensor<f16, { [-1] }>,
         rhs: &Tensor<f16, { [-1] }>,
     ) {
-        let lhs_tile = load_tile_like_1d(lhs, out);
-        let rhs_tile = load_tile_like_1d(rhs, out);
+        let lhs_tile = load_tile_like(lhs, out);
+        let rhs_tile = load_tile_like(rhs, out);
         out.store(lhs_tile + rhs_tile);
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn add_2d_f16<const BLOCK_SIZE: i32>(
         out: &mut Tensor<f16, { [1, BLOCK_SIZE] }>,
         lhs: &Tensor<f16, { [-1, -1] }>,
@@ -104,16 +98,14 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn silu_mul_vec_f16<const S: [i32; 1]>(
         out: &mut Tensor<f16, S>,
         gate: &Tensor<f16, { [-1] }>,
         up: &Tensor<f16, { [-1] }>,
     ) {
-        let gate_f16 = load_tile_like_1d(gate, out);
-        let up_f16 = load_tile_like_1d(up, out);
+        let gate_f16 = load_tile_like(gate, out);
+        let up_f16 = load_tile_like(up, out);
         let gate_f32: Tile<f32, S> = convert_tile(gate_f16);
         let up_f32: Tile<f32, S> = convert_tile(up_f16);
         let one: Tile<f32, S> = constant(1.0f32, out.shape());
@@ -128,9 +120,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn silu_mul_2d_f16<const BLOCK_SIZE: i32>(
         out: &mut Tensor<f16, { [1, BLOCK_SIZE] }>,
         gate: &Tensor<f16, { [-1, -1] }>,
@@ -159,9 +149,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn rms_norm_f16<const N: i32, const BLOCK_SIZE: i32>(
         x: &Tensor<f16, { [-1, N] }>,
         w: &Tensor<f16, { [N] }>,
@@ -185,7 +173,7 @@ pub mod kernels {
         let rms: f32 = tile_to_scalar(rms);
         let n: f32 = convert_scalar(N);
         let inv_rms: f32 = rms / n + eps;
-        let inv_rms: Tile<f32, { [] }> = rsqrt(scalar_to_tile(inv_rms));
+        let inv_rms: Tile<f32, { [] }> = rsqrt(scalar_to_tile(inv_rms), ftz::Disabled);
         let inv_rms: f32 = tile_to_scalar(inv_rms);
         let inv_rms: Tile<f32, { [1, BLOCK_SIZE] }> = inv_rms.broadcast(tile_shape);
 
@@ -204,9 +192,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn argmax_blocks_f16<const BLOCK_SIZE: i32>(
         logits: &Tensor<f16, { [-1] }>,
         block_max: &mut Tensor<f32, { [1] }>,
@@ -255,9 +241,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn gather_row_f16<const BLOCK_SIZE: i32>(
         src: &Tensor<f16, { [-1, -1] }>,
         out: &mut Tensor<f16, { [BLOCK_SIZE] }>,
@@ -272,9 +256,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn rope_f16<const D: i32, const HALF_D: i32>(
         x: &mut Tensor<f16, { [1, D] }>,
         inv_freq: &Tensor<f32, { [HALF_D] }>,
@@ -309,9 +291,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn rope_seq_f16<const D: i32, const HALF_D: i32>(
         x: &Tensor<f16, { [-1, -1, D] }>,
         inv_freq: &Tensor<f32, { [HALF_D] }>,
@@ -353,9 +333,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn rope_seq_dynpos_f16<const D: i32, const HALF_D: i32>(
         x: &Tensor<f16, { [-1, -1, D] }>,
         inv_freq: &Tensor<f32, { [HALF_D] }>,
@@ -402,9 +380,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn embedding_f16<const D: i32, const BLOCK_SIZE: i32>(
         token_ids: &Tensor<u32, { [-1] }>,
         table: &Tensor<f16, { [-1, D] }>,
@@ -428,9 +404,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn embedding_batch_f16<const D: i32, const BLOCK_SIZE: i32>(
         token_ids: &Tensor<u32, { [-1] }>,
         table: &Tensor<f16, { [-1, D] }>,
@@ -452,9 +426,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn kv_cache_update_f16<const D: i32, const BLOCK_SIZE: i32, const MAX_SEQ: i32>(
         new_k: &Tensor<f16, { [-1, D] }>,
         new_v: &Tensor<f16, { [-1, D] }>,
@@ -484,9 +456,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn kv_cache_update_seq_f16<const D: i32, const BLOCK_SIZE: i32, const MAX_SEQ: i32>(
         new_k: &Tensor<f16, { [-1, -1, D] }>,
         new_v: &Tensor<f16, { [-1, -1, D] }>,
@@ -520,9 +490,7 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     fn kv_cache_update_seq_dynpos_f16<const D: i32, const BLOCK_SIZE: i32, const MAX_SEQ: i32>(
         new_k: &Tensor<f16, { [-1, -1, D] }>,
         new_v: &Tensor<f16, { [-1, -1, D] }>,
@@ -562,9 +530,7 @@ pub mod kernels {
 
     #[cutile::entry(print_ir=false,
                        unchecked_accesses=true,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     unsafe fn flash_attn_f16<const BM: i32, const BN: i32, const D: i32>(
         q: &Tensor<f16, { [-1, -1, D] }>,
         k: &Tensor<f16, { [-1, -1, D] }>,
@@ -629,7 +595,7 @@ pub mod kernels {
             let l_ij: Tile<f32, { [BM] }> = reduce_sum(p, 1i32);
             let l_ij: Tile<f32, { [BM, 1] }> = l_ij.reshape(const_shape![BM, 1]);
             let alpha: Tile<f32, { [BM, 1] }> = exp(m_i - m_ij);
-            l_i = fma(l_i, alpha, l_ij);
+            l_i = fma(l_i, alpha, l_ij, rounding::NearestEven, ftz::Disabled);
             let alpha: Tile<f32, { [BM, D] }> = alpha.broadcast(const_shape![BM, D]);
             acc = acc * alpha;
 
@@ -648,9 +614,7 @@ pub mod kernels {
 
     #[cutile::entry(print_ir=false,
                        unchecked_accesses=true,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     unsafe fn flash_attn_causal_f16<const BM: i32, const BN: i32, const D: i32>(
         q: &Tensor<f16, { [-1, -1, D] }>,
         k: &Tensor<f16, { [-1, -1, D] }>,
@@ -725,7 +689,7 @@ pub mod kernels {
             let l_ij: Tile<f32, { [BM] }> = reduce_sum(p, 1i32);
             let l_ij: Tile<f32, { [BM, 1] }> = l_ij.reshape(const_shape![BM, 1]);
             let alpha: Tile<f32, { [BM, 1] }> = exp(m_i - m_ij);
-            l_i = fma(l_i, alpha, l_ij);
+            l_i = fma(l_i, alpha, l_ij, rounding::NearestEven, ftz::Disabled);
             let alpha: Tile<f32, { [BM, D] }> = alpha.broadcast(const_shape![BM, D]);
             acc = acc * alpha;
 
@@ -744,9 +708,7 @@ pub mod kernels {
 
     #[cutile::entry(print_ir=false,
                        unchecked_accesses=true,
-                       optimization_hints = (
-                         sm_120 = (occupancy=1, max_divisibility=16,),
-                       ))]
+                       optimization_hints = ())]
     unsafe fn flash_attn_causal_seq_f16<const BM: i32, const BN: i32, const D: i32>(
         q: &Tensor<f16, { [-1, -1, D] }>,      // [q_len, q_heads, d]
         k: &Tensor<f16, { [-1, -1, D] }>,      // [kv_heads, kv_len, d]
@@ -821,7 +783,7 @@ pub mod kernels {
             let l_ij: Tile<f32, { [BM] }> = reduce_sum(p, 1i32);
             let l_ij: Tile<f32, { [BM, 1] }> = l_ij.reshape(const_shape![BM, 1]);
             let alpha: Tile<f32, { [BM, 1] }> = exp(m_i - m_ij);
-            l_i = fma(l_i, alpha, l_ij);
+            l_i = fma(l_i, alpha, l_ij, rounding::NearestEven, ftz::Disabled);
             let alpha: Tile<f32, { [BM, D] }> = alpha.broadcast(const_shape![BM, D]);
             acc = acc * alpha;
 
@@ -839,11 +801,8 @@ pub mod kernels {
     }
 
     #[cutile::entry(print_ir=false,
-                       unchecked_accesses=true,
-                       optimization_hints = (
-                         tensor_dim_factor = 16,
-                         sm_120 = (occupancy=4,),
-                       ))]
+                    unchecked_accesses=true,
+                    optimization_hints = (sm_120 = (occupancy=4,),))]
     unsafe fn flash_attn_causal_seq_dynpos_f16<const BM: i32, const BN: i32, const D: i32>(
         q: &Tensor<f16, { [-1, -1, D] }>,      // [q_len, q_heads, d]
         k: &Tensor<f16, { [-1, -1, D] }>,      // [kv_heads, kv_len, d]
@@ -925,7 +884,7 @@ pub mod kernels {
             let l_ij: Tile<f32, { [BM] }> = reduce_sum(p, 1i32);
             let l_ij: Tile<f32, { [BM, 1] }> = l_ij.reshape(const_shape![BM, 1]);
             let alpha: Tile<f32, { [BM, 1] }> = exp(m_i - m_ij);
-            l_i = fma(l_i, alpha, l_ij);
+            l_i = fma(l_i, alpha, l_ij, rounding::NearestEven, ftz::Disabled);
             let alpha: Tile<f32, { [BM, D] }> = alpha.broadcast(const_shape![BM, D]);
             acc = acc * alpha;
 

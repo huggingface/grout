@@ -1,31 +1,33 @@
 use anyhow::{Result, anyhow, bail};
-use cuda_core::{CudaStream, DriverError, IntoResult, stream, sys};
+use cuda_core::{DriverError, IntoResult, Stream, sys};
 use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 const CU_STREAM_CAPTURE_MODE_RELAXED: u32 = 2;
 
 pub struct CudaGraphExec {
-    stream: Arc<CudaStream>,
+    stream: Arc<Stream>,
     cu_graph: sys::CUgraph,
     cu_graph_exec: sys::CUgraphExec,
 }
 
 impl CudaGraphExec {
-    pub fn capture<F>(stream: Arc<CudaStream>, f: F) -> Result<Self>
+    pub fn capture<F>(stream: Arc<Stream>, f: F) -> Result<Self>
     where
         F: FnOnce() -> Result<()>,
     {
-        let ctx = stream.context().clone();
-        ctx.bind_to_thread()
+        let device = stream.device().clone();
+        device
+            .bind_to_thread()
             .map_err(|e| anyhow!("failed to bind CUDA context: {e:?}"))?;
         unsafe {
-            stream::begin_capture(stream.cu_stream(), CU_STREAM_CAPTURE_MODE_RELAXED)
+            stream
+                .begin_capture(CU_STREAM_CAPTURE_MODE_RELAXED)
                 .map_err(|e| anyhow!("cuStreamBeginCapture_v2 failed: {e:?}"))?;
         }
 
         let work_res = f();
-        let end_capture = unsafe { stream::end_capture(stream.cu_stream()) };
+        let end_capture = unsafe { stream.end_capture() };
         let cu_graph = match (work_res, end_capture) {
             (Err(err), Ok(cu_graph)) => {
                 if !cu_graph.is_null() {
@@ -81,24 +83,24 @@ impl CudaGraphExec {
         Ok(())
     }
 
-    pub fn stream(&self) -> &Arc<CudaStream> {
+    pub fn stream(&self) -> &Arc<Stream> {
         &self.stream
     }
 }
 
 impl Drop for CudaGraphExec {
     fn drop(&mut self) {
-        let ctx = self.stream.context();
-        ctx.record_err(ctx.bind_to_thread());
+        let device = self.stream.device();
+        let _ = device.bind_to_thread();
 
         let cu_graph_exec = std::mem::replace(&mut self.cu_graph_exec, std::ptr::null_mut());
         if !cu_graph_exec.is_null() {
-            ctx.record_err(unsafe { destroy_graph_exec(cu_graph_exec) });
+            let _ = unsafe { destroy_graph_exec(cu_graph_exec) };
         }
 
         let cu_graph = std::mem::replace(&mut self.cu_graph, std::ptr::null_mut());
         if !cu_graph.is_null() {
-            ctx.record_err(unsafe { destroy_graph(cu_graph) });
+            let _ = unsafe { destroy_graph(cu_graph) };
         }
     }
 }

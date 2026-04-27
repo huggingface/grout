@@ -84,10 +84,16 @@ impl DecodeCudaGraphRunner {
     }
 
     fn synchronize(&self) -> Result<()> {
-        self.graph
-            .stream()
-            .synchronize()
-            .map_err(|e| anyhow::anyhow!("stream synchronize failed: {e:?}"))
+        let stream = self.graph.stream();
+        stream
+            .device()
+            .bind_to_thread()
+            .map_err(|e| anyhow::anyhow!("failed to bind CUDA context: {e:?}"))?;
+        unsafe {
+            stream
+                .synchronize()
+                .map_err(|e| anyhow::anyhow!("stream synchronize failed: {e:?}"))
+        }
     }
 }
 
@@ -1409,9 +1415,14 @@ impl Qwen3Engine {
             position_device.clone(),
             &mut prime_logits,
         )?;
-        ctx.get_cuda_stream()
-            .synchronize()
-            .map_err(|e| anyhow::anyhow!("stream synchronize failed: {e:?}"))?;
+        ctx.device()
+            .bind_to_thread()
+            .map_err(|e| anyhow::anyhow!("failed to bind CUDA context: {e:?}"))?;
+        unsafe {
+            ctx.get_cuda_stream()
+                .synchronize()
+                .map_err(|e| anyhow::anyhow!("stream synchronize failed: {e:?}"))?;
+        }
 
         let mut final_logits = Some(alloc_f16_ctx(ctx, &graph.spec(graph.final_value).shape)?);
         let mut captured_logits: Option<Arc<Tensor<f16>>> = None;
