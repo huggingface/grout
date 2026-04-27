@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cuda-core = { git = "https://github.com/NVlabs/cutile-rs" }
-cuda-async = { git = "https://github.com/NVlabs/cutile-rs" }
-cutile-compiler = { git = "https://github.com/NVlabs/cutile-rs" }
-cutile = { git = "https://github.com/NVlabs/cutile-rs" }
+cuda-core = { version = "0.0.2" }
+cuda-async = { version = "0.0.2" }
+cutile-compiler = { version = "0.0.2" }
+cutile = { version = "0.0.2" }
 
 anyhow = "1.0.102"
 clap = { version = "4.5.60", features = ["derive"] }

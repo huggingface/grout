@@ -324,8 +324,9 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "cuda-async"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1ac3f50af1b80a456e456f54727a2ce51f6adc557172e196e807f2ac857613c"
 dependencies = [
  "anyhow",
  "cuda-core",
@@ -336,16 +337,18 @@ dependencies = [
 
 [[package]]
 name = "cuda-bindings"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e01b854707c4124faf5866393d0e623902248815a4d09c525f47de5c32b38a81"
 dependencies = [
  "bindgen",
 ]
 
 [[package]]
 name = "cuda-core"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87b864f44dd3aa1cd73276483811e3a40500fd9766566dac1e8081371fec2f3a"
 dependencies = [
  "anyhow",
  "cuda-bindings",
@@ -363,8 +366,9 @@ dependencies = [
 
 [[package]]
 name = "cutile"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "125eeed27c8b074047d25aa80c11b89d362f2cb704cc564f881029471318ed99"
 dependencies = [
  "anyhow",
  "cuda-async",
@@ -382,8 +386,9 @@ dependencies = [
 
 [[package]]
 name = "cutile-compiler"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a944beffd76ffc3765e86a94de1a03f6778683403b0a1c0b5c88d121531f9b6"
 dependencies = [
  "anyhow",
  "cuda-async",
@@ -402,8 +407,9 @@ dependencies = [
 
 [[package]]
 name = "cutile-ir"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9169ea79446f49bfdaa3f3953f1b06d3889af1252f11a160aa788d660d34c448"
 dependencies = [
  "half",
  "indexmap",
@@ -412,8 +418,9 @@ dependencies = [
 
 [[package]]
 name = "cutile-macro"
-version = "0.0.1"
-source = "git+https://github.com/NVlabs/cutile-rs#3859b933b48807d4f0c712f02302b382447364e4"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b030e56a289e33879810d4305c2dd5db78235b0d2f487d799ed4a3eefffc3d1"
 dependencies = [
  "convert_case",
  "cutile-compiler",
