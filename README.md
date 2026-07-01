@@ -1,7 +1,7 @@
 # Grout
 
-Qwen3 inference testbed built on
-[cuTile Rust](https://github.com/nvidia/cutile-rs) 0.2.0.
+Qwen3 inference engine built on
+[cuTile Rust](https://github.com/NVlabs/cutile-rs) 0.2.0.
 
 ## Requirements
 

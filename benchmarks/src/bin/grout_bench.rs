@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "Qwen3 inference testbed on cutile-rs")]
+#[command(author, version, about = "Qwen3 inference engine on cutile-rs")]
 struct Args {
     #[arg(long, default_value = "../hf_models/qwen3_4b")]
     model: PathBuf,
