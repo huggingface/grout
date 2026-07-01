@@ -40,9 +40,8 @@ fn qwen3_hello_prompt_generates_coherent_text() {
     // The plain CLI prints the generated text directly (no per-rep timing
     // header), so inspect the whole stdout for coherence markers.
     let has_greeting = stdout.contains("Hello!") || stdout.contains("I'm");
-    let has_assistant_marker = stdout.contains("Qwen")
-        || stdout.contains("assist")
-        || stdout.contains("language model");
+    let has_assistant_marker =
+        stdout.contains("Qwen") || stdout.contains("assist") || stdout.contains("language model");
     assert!(
         has_greeting && has_assistant_marker,
         "generated text did not look coherent\nstdout:\n{}\nstderr:\n{}",

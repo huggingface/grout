@@ -25,7 +25,7 @@ Environment is configured via `.cargo/config.toml`:
 |---|---|---|
 | `CUDA_TOOLKIT_PATH` | `/usr/local/cuda-13` | CUDA toolkit location |
 | `GROUT_CUBLAS_COMPUTE16` | auto | cuBLAS accumulation mode for decode GEMVs |
-| `GROUT_ATTN_BN_DECODE` | `64` | Attention tile size for decode |
+| `GROUT_ATTN_BN_DECODE` | `32` | Attention tile size for decode |
 
 ## Build and run
 
@@ -59,7 +59,7 @@ The first run compiles all cuTile kernels (MLIR -> PTX -> CUBIN). Subsequent run
 | `GROUT_CUBLAS_COMPUTE16_MAX_M` | unset | Max M dimension for fp16 accumulation |
 | `GROUT_CUBLAS_FAST_ALGO` | `default_tensor_op` | cuBLAS algorithm selection |
 | `GROUT_FUSED_LM_HEAD_ARGMAX` | `0` | Experimental greedy decode path that fuses LM-head scoring with block argmax and skips materializing logits |
-| `GROUT_ATTN_BN_DECODE` | `64` | KV tile size for decode attention |
+| `GROUT_ATTN_BN_DECODE` | `32` | KV tile size for decode attention |
 | `GROUT_DEBUG_POOL_ALLOC` | `0` | `1` = log tensor pool fallback allocations |
 
 ## Architecture

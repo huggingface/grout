@@ -2283,10 +2283,15 @@ impl Qwen3Engine {
         let mut token_ids: Tensor<u32> = api::zeros(&[1])
             .sync_on(stream)
             .map_err(|e| anyhow::anyhow!("alloc token_ids failed: {e:?}"))?;
-        let position: Tensor<u32> = api::zeros(&[1])
+        // The eager prime pass below runs real kernels against the same KV
+        // caches populated by prefill. Seed the device position to the first
+        // decode slot so kernel warmup does not overwrite prompt cache slot 0.
+        let position_init = Arc::new(vec![position_start as u32]);
+        let position: Tensor<u32> = api::copy_host_vec_to_device(&position_init)
             .sync_on(stream)
             .map_err(|e| anyhow::anyhow!("alloc position failed: {e:?}"))?;
-        let s_kv_device: Tensor<i32> = api::zeros(&[1])
+        let s_kv_init = Arc::new(vec![(position_start + 1) as i32]);
+        let s_kv_device: Tensor<i32> = api::copy_host_vec_to_device(&s_kv_init)
             .sync_on(stream)
             .map_err(|e| anyhow::anyhow!("alloc s_kv_device failed: {e:?}"))?;
 
