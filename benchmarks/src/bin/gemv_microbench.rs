@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use anyhow::{Result, anyhow, bail};
 use clap::Parser;
-use cuda_async::device_operation::{DeviceOp, value, with_context};
-use cuda_core::{IntoResult, Stream, sys as cu_sys};
+use cutile::cuda_async::device_operation::{DeviceOp, value, with_context};
+use cutile::cuda_core::{IntoResult, Stream, sys as cu_sys};
 use cutile::{api, core::f16, tensor::Tensor};
 
 #[path = "../../../src/cublas.rs"]

@@ -1,16 +1,17 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use clap::Parser;
-use cuda_async::device_operation::{DeviceOp, value, with_context};
-use cuda_core::Stream;
+use cutile::cuda_async::device_operation::{value, with_context, DeviceOp};
+use cutile::cuda_core::Stream;
 use cutile::tensor::{IntoPartition, Reshape, Tensor, ToHostVec};
 use cutile::tile_kernel::TileKernel;
 use cutile::{api, core::f16};
 
 use grout::kernels::{
-    fmha_prefill_causal, fmha_prefill_gqa, fmha_prefill_gqa_lpt, fmha_prefill_gqa_lpt_split,
+    fmha_prefill_causal_mapped,
+    fmha_prefill_gqa_lpt_checked, fmha_prefill_gqa_lpt_split, fmha_prefill_gqa_mapped,
     prefill_splitk_reduce_merge,
 };
 
@@ -84,6 +85,11 @@ struct Args {
     /// Check output against a CPU reference. Intended for small shapes.
     #[arg(long)]
     check: bool,
+
+    /// Print an FNV-1a hash of the output tensor bytes (stderr) for
+    /// cross-arm bitwise comparison; inputs are deterministic by index.
+    #[arg(long, default_value_t = false)]
+    output_hash: bool,
 }
 
 struct Buffers {
@@ -120,7 +126,11 @@ async fn main() -> Result<()> {
     );
 
     let mode = args.mode.trim().to_ascii_lowercase();
-    if mode != "causal" && mode != "gqa" && mode != "gqa-lpt" && mode != "gqa-lpt-split" {
+    if mode != "causal"
+        && mode != "gqa"
+        && mode != "gqa-lpt"
+        && mode != "gqa-lpt-split"
+    {
         bail!(
             "unknown --mode `{}`; expected causal, gqa, gqa-lpt, or gqa-lpt-split",
             args.mode
@@ -154,6 +164,33 @@ async fn main() -> Result<()> {
             buffers.lse_partial.as_mut(),
         )?;
         check_attention(&stream, &args, &buffers, checked_out)?;
+        buffers.out = alloc_zeros(&stream, &[args.q_len, args.q_heads, args.head_dim], "out")?;
+    }
+    if args.output_hash {
+        let out = std::mem::replace(
+            &mut buffers.out,
+            alloc_zeros(&stream, &[args.q_len, args.q_heads, args.head_dim], "out")?,
+        );
+        let hashed_out = launch_attention(
+            &stream,
+            &args,
+            &mode,
+            out,
+            &buffers.q,
+            &buffers.k,
+            &buffers.v,
+            buffers.att_partial.as_mut(),
+            buffers.lse_partial.as_mut(),
+        )?;
+        let host: Vec<f16> = hashed_out.to_host_vec().sync_on(&stream)?;
+        let mut h: u64 = 0xcbf29ce484222325;
+        for v in &host {
+            for b in v.to_bits().to_le_bytes() {
+                h ^= u64::from(b);
+                h = h.wrapping_mul(0x100000001b3);
+            }
+        }
+        eprintln!("output_hash={h:016x}");
         buffers.out = alloc_zeros(&stream, &[args.q_len, args.q_heads, args.head_dim], "out")?;
     }
 
@@ -266,7 +303,11 @@ fn alloc_split_scratch(
 
 fn alloc_buffers(stream: &Arc<Stream>, args: &Args, mode: &str) -> Result<Buffers> {
     let (att_partial, lse_partial) = alloc_split_scratch(stream, args, mode)?;
-    if args.check {
+    // The deterministic input pattern is required by --check AND by
+    // --output-hash: over zero-filled Q/K/V every attention kernel writes an
+    // all-zero output, so a hash of it compares nothing (found the hard way —
+    // the hash matched the FNV-1a of an all-zero buffer).
+    if args.check || args.output_hash {
         let q_len = args.q_len * args.q_heads * args.head_dim;
         let k_len = args.kv_heads * args.q_len * args.head_dim;
         let v_len = k_len;
@@ -515,25 +556,21 @@ fn launch_attention(
             let swizzle = lpt_swizzle(args, num_head_groups);
             let num_hb_quotient = num_head_groups / swizzle;
             let num_hb_remainder = (num_head_groups % swizzle).max(1);
-            let out_ptr = out.device_pointer().clone();
-            unsafe {
-                fmha_prefill_gqa_lpt(
-                    q.device_pointer().clone(),
-                    k.device_pointer().clone(),
-                    v.device_pointer().clone(),
-                    out_ptr,
-                    value(qk_scale),
-                    value(qgs as i32),
-                    value(args.q_len as i32),
-                    value(args.q_len as i32),
-                    value(0i32),
-                    value(num_q_blocks as i32),
-                    value(num_head_groups as i32),
-                    value(swizzle as i32),
-                    value(num_hb_quotient as i32),
-                    value(num_hb_remainder as i32),
-                )
-            }
+            fmha_prefill_gqa_lpt_checked(
+                &*q,
+                &*k,
+                &*v,
+                &out,
+                value(qk_scale),
+                value(qgs as i32),
+                value(args.q_len as i32),
+                value(0i32),
+                value(num_q_blocks as i32),
+                value(num_head_groups as i32),
+                value(swizzle as i32),
+                value(num_hb_quotient as i32),
+                value(num_hb_remainder as i32),
+            )
             .generics(vec![
                 args.bm.to_string(),
                 args.bn.to_string(),
@@ -551,22 +588,28 @@ fn launch_attention(
                 cutile::tile_kernel::CompileOptions::default().occupancy(args.occupancy as i32),
             )
             .sync_on(stream)
-            .map_err(|e| anyhow!("fmha_prefill_gqa_lpt failed: {e:?}"))?;
+            .map_err(|e| anyhow!("fmha_prefill_gqa_lpt_checked failed: {e:?}"))?;
             return Ok(out);
         }
-        let out_part = out.partition([args.bm, group, args.head_dim]);
-        let result = unsafe {
-            fmha_prefill_gqa(
-                value(q.clone()),
-                value(k.clone()),
-                value(v.clone()),
-                value(out_part),
-                value(qk_scale),
-                value(qgs as i32),
-                value(args.q_len as i32),
-                value(0i32),
-            )
-        }
+        ensure!(
+            args.q_heads % group == 0,
+            "group must divide q_heads={}",
+            args.q_heads
+        );
+        let ntb = (args.q_len.div_ceil(args.bm) * (args.q_heads / group)) as u32;
+        let out_part = out
+            .partition([args.bm, group, args.head_dim])
+            .map([1, 1, 1], ntb);
+        let result = fmha_prefill_gqa_mapped(
+            value(out_part),
+            value(q.clone()),
+            value(k.clone()),
+            value(v.clone()),
+            value(qk_scale),
+            value(qgs as i32),
+            value(args.q_len as i32),
+            value(0i32),
+        )
         .generics(vec![
             args.bm.to_string(),
             args.bn.to_string(),
@@ -576,27 +619,31 @@ fn launch_attention(
             1.to_string(),
             even_k.to_string(),
             args.latency.to_string(),
+            "1".to_string(),
+            "1".to_string(),
+            "1".to_string(),
         ])
         .compile_options(
             cutile::tile_kernel::CompileOptions::default().occupancy(args.occupancy as i32),
         )
         .sync_on(stream)
-        .map_err(|e| anyhow!("fmha_prefill_gqa failed: {e:?}"))?;
-        Ok(result.3.unpartition())
+        .map_err(|e| anyhow!("fmha_prefill_gqa_mapped failed: {e:?}"))?;
+        Ok(result.0.unpartition())
     } else {
-        let out_part = out.partition([args.bm, 1, args.head_dim]);
-        let result = unsafe {
-            fmha_prefill_causal(
-                value(q.clone()),
-                value(k.clone()),
-                value(v.clone()),
-                value(out_part),
-                value(qk_scale),
-                value(qgs as i32),
-                value(args.q_len as i32),
-                value(0i32),
-            )
-        }
+        let ntb = (args.q_len.div_ceil(args.bm) * args.q_heads) as u32;
+        let out_part = out
+            .partition([args.bm, 1, args.head_dim])
+            .map([1, 1, 1], ntb);
+        let result = fmha_prefill_causal_mapped(
+            value(out_part),
+            value(q.clone()),
+            value(k.clone()),
+            value(v.clone()),
+            value(qk_scale),
+            value(qgs as i32),
+            value(args.q_len as i32),
+            value(0i32),
+        )
         .generics(vec![
             args.bm.to_string(),
             args.bn.to_string(),
@@ -604,13 +651,16 @@ fn launch_attention(
             1.to_string(),
             even_k.to_string(),
             args.latency.to_string(),
+            "1".to_string(),
+            "1".to_string(),
+            "1".to_string(),
         ])
         .compile_options(
             cutile::tile_kernel::CompileOptions::default().occupancy(args.occupancy as i32),
         )
         .sync_on(stream)
-        .map_err(|e| anyhow!("fmha_prefill_causal failed: {e:?}"))?;
-        Ok(result.3.unpartition())
+        .map_err(|e| anyhow!("fmha_prefill_causal_mapped failed: {e:?}"))?;
+        Ok(result.0.unpartition())
     }
 }
 

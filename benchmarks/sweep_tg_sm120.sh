@@ -40,10 +40,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 : "${GROUT_FMHA_NUM_KV_SPLITS_TG_128:=4}"
 : "${GROUT_ATTN_BN_DECODE_TG_512:=32}"
 : "${GROUT_FMHA_NUM_KV_SPLITS_TG_512:=8}"
-: "${GROUT_ATTN_BN_DECODE_TG_2048:=64}"
+# BN=32 is the mapped decode kernel's optimum at long kv too — the old BN=64
+# values here were tuned on the legacy kernels and cost ~4-7% at tg>=2048
+# (paired shape check, 2026-07-07: tg=2048 12.09s vs 12.65s; tg=8192 50.61s
+# vs 54.73s). Per-kernel-form lesson applies to this wrapper as well.
+: "${GROUT_ATTN_BN_DECODE_TG_2048:=32}"
 : "${GROUT_FMHA_NUM_KV_SPLITS_TG_2048:=16}"
-: "${GROUT_ATTN_BN_DECODE_TG_8192:=64}"
-: "${GROUT_FMHA_NUM_KV_SPLITS_TG_8192:=32}"
+: "${GROUT_ATTN_BN_DECODE_TG_8192:=32}"
+: "${GROUT_FMHA_NUM_KV_SPLITS_TG_8192:=16}"
 
 # Current CUDA/cuBLAS stack prefers f16 accumulation for the Qwen3-4B decode
 # GEMVs on RTX 5090. Override externally for diagnostics only.

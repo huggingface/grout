@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow, ensure};
-use cuda_async::device_operation::{DeviceOp, GraphNode, value, with_context};
-use cuda_async::error::DeviceError;
-use cuda_core::{IntoResult, sys as cu_sys};
+use cutile::cuda_async::device_operation::{DeviceOp, GraphNode, value, with_context};
+use cutile::cuda_async::error::DeviceError;
+use cutile::cuda_core::{IntoResult, sys as cu_sys};
 use cudarc::cublas::{result as cublas_result, sys as cublas_sys};
 use cutile::core::f16;
 use cutile::tensor::Tensor;
@@ -84,6 +84,10 @@ fn selected_fast_compute_type(
                 //   gate_up (m=51200,k=5120,n=1), where compute16 wins.
                 // Keep the old compute16 default on sm_120/RTX 5090.
                 Some((10, 0)) => n == 1 && m == 51200 && k == 5120,
+                // Every other arch takes the fp16-accumulate path: sm_120,
+                // sm_121 (GB10 / DGX Spark, never retuned), and anything not
+                // yet measured. Only sm_100 has been measured to prefer
+                // 32F_FAST_16F for most decode GEMVs.
                 _ => true,
             }
         }
@@ -583,7 +587,7 @@ impl DeviceOp for GemvInPlace<'_> {
     type Output = ();
     unsafe fn execute(
         self,
-        ctx: &cuda_async::device_operation::ExecutionContext,
+        ctx: &cutile::cuda_async::device_operation::ExecutionContext,
     ) -> Result<(), DeviceError> {
         unsafe {
             ctx.device()
@@ -608,9 +612,9 @@ impl DeviceOp for GemvInPlace<'_> {
 
 impl std::future::IntoFuture for GemvInPlace<'_> {
     type Output = Result<(), DeviceError>;
-    type IntoFuture = cuda_async::device_future::DeviceFuture<(), Self>;
+    type IntoFuture = cutile::cuda_async::device_future::DeviceFuture<(), Self>;
     fn into_future(self) -> Self::IntoFuture {
-        cuda_async::device_future::DeviceFuture::failed(DeviceError::Internal(
+        cutile::cuda_async::device_future::DeviceFuture::failed(DeviceError::Internal(
             "GemvInPlace is only for graph capture, not standalone execution".into(),
         ))
     }
@@ -633,7 +637,7 @@ impl DeviceOp for GemmInPlace<'_> {
     type Output = ();
     unsafe fn execute(
         self,
-        ctx: &cuda_async::device_operation::ExecutionContext,
+        ctx: &cutile::cuda_async::device_operation::ExecutionContext,
     ) -> Result<(), DeviceError> {
         unsafe {
             ctx.device()
@@ -658,9 +662,9 @@ impl DeviceOp for GemmInPlace<'_> {
 
 impl std::future::IntoFuture for GemmInPlace<'_> {
     type Output = Result<(), DeviceError>;
-    type IntoFuture = cuda_async::device_future::DeviceFuture<(), Self>;
+    type IntoFuture = cutile::cuda_async::device_future::DeviceFuture<(), Self>;
     fn into_future(self) -> Self::IntoFuture {
-        cuda_async::device_future::DeviceFuture::failed(DeviceError::Internal(
+        cutile::cuda_async::device_future::DeviceFuture::failed(DeviceError::Internal(
             "GemmInPlace is only for graph capture, not standalone execution".into(),
         ))
     }

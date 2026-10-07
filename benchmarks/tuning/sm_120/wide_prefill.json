@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "kernel": "wide_prefill",
+  "source_hash": "3ed0e8efdd38a4f2fb55fcba3380f936bda8bbfc31bad853232ec26581446c85",
+  "cutile_version": "0.4.0",
+  "tileiras_fingerprint": "tileiras: NVIDIA (R) Cuda Tile IR optimizing assembler\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Fri_May__1_20:03:54_PDT_2026\nCuda compilation tools, release 13.3, V13.3.36\nBuild local.local.37905922_",
+  "arch": "sm_120",
+  "machine": "rtx5090",
+  "created_unix_secs": 1787443741,
+  "space_hash": "5ad43df80b822c1e",
+  "gate": "step-success-v1",
+  "entries": [
+    {
+      "bucket": "pp=2048",
+      "config": {
+        "id": "GROUT_QK_PREFILL_BM=32,GROUT_QK_PREFILL_WARPS=0",
+        "params": {
+          "GROUT_QK_PREFILL_BM": 32,
+          "GROUT_QK_PREFILL_WARPS": 0
+        }
+      },
+      "median_ms": 52.475346,
+      "samples": 3,
+      "l2_key": null
+    },
+    {
+      "bucket": "pp=8192",
+      "config": {
+        "id": "GROUT_QK_PREFILL_BM=16,GROUT_QK_PREFILL_WARPS=1",
+        "params": {
+          "GROUT_QK_PREFILL_BM": 16,
+          "GROUT_QK_PREFILL_WARPS": 1
+        }
+      },
+      "median_ms": 280.927,
+      "samples": 3,
+      "l2_key": null
+    }
+  ]
+}

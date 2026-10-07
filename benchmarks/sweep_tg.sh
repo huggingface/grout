@@ -48,6 +48,10 @@ MODEL_MAX_LEN="${MODEL_MAX_LEN:-16384}"
 GROUT_MAX_SEQ_LEN="${GROUT_MAX_SEQ_LEN:-}"
 SGLANG_CONTEXT_LENGTH="${SGLANG_CONTEXT_LENGTH:-$MODEL_MAX_LEN}"
 VLLM_MAX_MODEL_LEN="${VLLM_MAX_MODEL_LEN:-$MODEL_MAX_LEN}"
+# vLLM budgets gpu_memory_utilization x total VRAM; on a desktop GPU the
+# display compositor's share can push the 0.9 default into startup OOM
+# ("warming up sampler with 256 dummy requests"). Set 0.8 on such boxes.
+VLLM_GPU_MEM_UTIL="${VLLM_GPU_MEM_UTIL:-0.9}"
 
 # Request-level upper-bound lines for the tg report. The aggregator reads
 # MODEL_HF/config.json and model.safetensors.index.json so the weight bytes
@@ -247,7 +251,7 @@ fi
 # --------------------------------------------------------------------------
 log "Benchmark: SGLang (no-radix)"
 SGLANG_PYTHON="$(venv_python sglang_env)"
-if [[ -n "$SGLANG_PYTHON" ]] && "$SGLANG_PYTHON" -c "import sglang" 2>/dev/null; then
+if [[ "${SWEEP_ENABLE_BASELINES:-1}" == 1 ]] && [[ -n "$SGLANG_PYTHON" ]] && "$SGLANG_PYTHON" -c "import sglang" 2>/dev/null; then
     for TG in "${TG_VALUES[@]}"; do
         RUN_BENCH_REPS="$(bench_reps_for_tg "$TG")"
         echo ""
@@ -273,7 +277,7 @@ fi
 # --------------------------------------------------------------------------
 log "Benchmark: vLLM (cuda-graph, prefix-cache OFF)"
 VLLM_PYTHON="$(venv_python vllm_env)"
-if [[ -n "$VLLM_PYTHON" ]] && "$VLLM_PYTHON" -c "import vllm" 2>/dev/null; then
+if [[ "${SWEEP_ENABLE_BASELINES:-1}" == 1 ]] && [[ -n "$VLLM_PYTHON" ]] && "$VLLM_PYTHON" -c "import vllm" 2>/dev/null; then
     for TG in "${TG_VALUES[@]}"; do
         RUN_BENCH_REPS="$(bench_reps_for_tg "$TG")"
         echo ""
@@ -288,6 +292,7 @@ if [[ -n "$VLLM_PYTHON" ]] && "$VLLM_PYTHON" -c "import vllm" 2>/dev/null; then
             --reps "$RUN_BENCH_REPS" \
             --warmup-reps "$WARMUP_REPS" \
             --max-model-len "$VLLM_MAX_MODEL_LEN" \
+            --gpu-mem-util "$VLLM_GPU_MEM_UTIL" \
             --json "$JSONL" \
             --pp-label "$PP_LABEL" \
             --mode cuda-graph \

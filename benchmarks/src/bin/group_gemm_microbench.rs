@@ -3,8 +3,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use clap::Parser;
-use cuda_async::device_operation::{DeviceOp, value, with_context};
-use cuda_core::{IntoResult, Stream, sys as cu_sys};
+use cutile::cuda_async::device_operation::{DeviceOp, value, with_context};
+use cutile::cuda_core::{IntoResult, Stream, sys as cu_sys};
 use cutile::tensor::{DeviceVec, Reshape, Tensor, ToHostVec};
 use cutile::tile_kernel::{CompileOptions, TileKernel};
 use cutile::{api, core::f16};

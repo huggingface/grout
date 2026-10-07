@@ -6,6 +6,7 @@ default-run = "grout"
 autobins = false
 
 [dependencies]
+libloading = "0.8"
 anyhow = "1.0.102"
 clap = { version = "4.5.60", features = ["derive"] }
 memmap2 = "0.9.10"
@@ -19,11 +20,7 @@ tokenizers = "0.20.4"
 
 cudarc = { version = "0.19.2", default-features = false, features = ["std", "cublas", "dynamic-loading", "cuda-13010"] }
 
-cuda-bindings = "0.2.0"
-cuda-core = "0.2.0"
-cuda-async = "0.2.0"
-cutile-compiler = "0.2.0"
-cutile = "0.2.0"
+cutile = { version = "0.4.0", features = ["experimental-tune"] }
 
 [features]
 benchmarks = []
@@ -38,6 +35,12 @@ path = "benchmarks/src/bin/grout_bench.rs"
 required-features = ["benchmarks"]
 
 [[bin]]
+name = "grout_autotune"
+path = "benchmarks/src/bin/grout_autotune.rs"
+required-features = ["benchmarks"]
+
+
+[[bin]]
 name = "attention_microbench"
 path = "benchmarks/src/bin/attention_microbench.rs"
 required-features = ["benchmarks"]
@@ -50,4 +53,9 @@ required-features = ["benchmarks"]
 [[bin]]
 name = "group_gemm_microbench"
 path = "benchmarks/src/bin/group_gemm_microbench.rs"
+required-features = ["benchmarks"]
+
+[[bin]]
+name = "persistent_gemm_microbench"
+path = "benchmarks/src/bin/persistent_gemm_microbench.rs"
 required-features = ["benchmarks"]

@@ -1,11 +1,15 @@
 # Grout
 
 Qwen3 inference engine built on
-[cuTile Rust](https://github.com/NVlabs/cutile-rs) 0.2.0.
+[cuTile Rust](https://github.com/NVlabs/cutile-rs) 0.4.0.
 
 ## Requirements
 
-- **CUDA** 13.2+
+- **CUDA**: 13.2 is the minimum the cuTile compiler accepts for Blackwell;
+  13.3 is recommended (and required for FP4 packing and block-scaled MMA in
+  cuTile Rust); the DGX Spark tutorial was tested on 13.4. Tuning records
+  carry the `tileiras` fingerprint they were produced with and warn (not
+  refuse) when the host's toolkit differs.
 
 ## Setup
 
@@ -49,7 +53,7 @@ The first run compiles all cuTile kernels (MLIR -> PTX -> CUBIN). Subsequent run
 | `--sample` | `false` | Enable sampling (temperature/top-k) |
 | `--raw-prompt` | `false` | Skip chat template wrapping |
 | `--device-argmax` | `false` | Run greedy argmax on the GPU |
-| `--profile` | `false` | Print per-kernel timing breakdown |
+| `--profile` | `false` | Print prefill/decode step averages; with `GROUT_PROFILE_OPS=1` also a per-op table (StepGraph ops only: prefill and warm-up, since decode replays a CUDA graph) |
 
 ## Environment variables
 
@@ -60,6 +64,9 @@ The first run compiles all cuTile kernels (MLIR -> PTX -> CUBIN). Subsequent run
 | `GROUT_CUBLAS_FAST_ALGO` | `default_tensor_op` | cuBLAS algorithm selection |
 | `GROUT_FUSED_LM_HEAD_ARGMAX` | `0` | Experimental greedy decode path that fuses LM-head scoring with block argmax and skips materializing logits |
 | `GROUT_ATTN_BN_DECODE` | `32` | KV tile size for decode attention |
+| `GROUT_PROFILE_OPS` | `0` | `1` = collect the per-op table printed by `--profile` (StepGraph ops only; graph-replayed decode steps are not itemized) |
+| `GROUT_PROFILE_SYNC_OPS` | `0` | `1` = synchronize the stream after each profiled op so per-op times are kernel times rather than launch overhead |
+| `GROUT_TUNING_RECORD_DIR` | `benchmarks/tuning` | Root of the per-arch tuning records (`<root>/sm_<xy>/*.json`); a missing arch directory warns and falls back to built-in defaults |
 | `GROUT_DEBUG_POOL_ALLOC` | `0` | `1` = log tensor pool fallback allocations |
 
 ## Architecture

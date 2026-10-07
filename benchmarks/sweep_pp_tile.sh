@@ -24,11 +24,24 @@ BENCH_ENVS_DIR="${BENCH_ENVS_DIR:-$GROUT_DIR/../bench_envs}"
 BENCH_CACHE_DIR="${BENCH_CACHE_DIR:-$BENCH_ENVS_DIR/.cache}"
 BENCH_HOME="${BENCH_HOME:-${SCRATCH:-$GROUT_DIR/..}}"
 export HOME="$BENCH_HOME"
+# Repointing HOME breaks rustup's toolchain lookup ($HOME/.rustup), which
+# silently fails the cargo build and lets the sweep run a STALE binary —
+# fatal with the ../cutile-rs path dependency. Keep rustup/cargo anchored
+# to the real home.
+REAL_HOME="$(getent passwd "$(id -u)" | cut -d: -f6)"
+export RUSTUP_HOME="${RUSTUP_HOME:-$REAL_HOME/.rustup}"
+export CARGO_HOME="${CARGO_HOME:-$REAL_HOME/.cargo}"
 export PATH="$BENCH_ENVS_DIR/sglang_env/bin:$BENCH_ENVS_DIR/vllm_env/bin:$PATH"
 BENCH_REPS="${BENCH_REPS:-10}"
 WARMUP_REPS="${WARMUP_REPS:-3}"
 PREFILL_BN_VALUES_RAW="${PREFILL_BN_VALUES:-16 32 64 128}"
+PREFILL_MODES_RAW="${PREFILL_MODES:-causal gqa}"
+CAUSAL_BM_VALUES_RAW="${CAUSAL_BM_VALUES:-16 32 64 128}"
+GQA_BM_VALUES_RAW="${GQA_BM_VALUES:-4 8 16 32}"
 read -r -a PREFILL_BN_VALUES <<< "$PREFILL_BN_VALUES_RAW"
+read -r -a PREFILL_MODES <<< "$PREFILL_MODES_RAW"
+read -r -a CAUSAL_BM_VALUES <<< "$CAUSAL_BM_VALUES_RAW"
+read -r -a GQA_BM_VALUES <<< "$GQA_BM_VALUES_RAW"
 
 # Keep tokenizer/model/JIT caches off the small container home mount.
 mkdir -p "$BENCH_CACHE_DIR"/{flashinfer_base,flashinfer_cubins,huggingface,torch,torchinductor,triton,tvm-ffi,vllm,vllm_config,xdg}
@@ -50,7 +63,8 @@ else
 fi
 
 echo "Building grout…"
-(cd "$GROUT_DIR" && cargo build --release --features benchmarks --bin grout_bench 2>&1 | tail -2)
+(cd "$GROUT_DIR" && cargo build --release --features benchmarks --bin grout_bench 2>&1 | tail -2) \
+    || { echo "FATAL: grout_bench build failed — refusing to sweep a stale binary." >&2; exit 1; }
 echo
 
 # Generate prompt files at exact token counts via make_prompts.py.
@@ -67,7 +81,10 @@ echo
 # Per-cell runner: returns prefill_ms median from the 10 timed reps.
 run_one() {
     local pp="$1" gqa="$2" bm="$3" bn="$4"
-    GROUT_FMHA_PREFILL_GQA="$gqa" \
+    local max_seq_len=$((pp + 36))
+    (( max_seq_len < 4096 )) && max_seq_len=4096
+    GROUT_FMHA_PREFILL_GQA_LPT=0 \
+        GROUT_FMHA_PREFILL_GQA="$gqa" \
         GROUT_ATTN_BM_PREFILL="$bm" \
         GROUT_ATTN_BN_PREFILL="$bn" \
         "$GROUT_DIR/target/release/grout_bench" \
@@ -75,6 +92,7 @@ run_one() {
         --prompt-file "$PROMPTS_DIR/pp_${pp}.txt" \
         --raw-prompt \
         --max-new-tokens 36 \
+        --max-seq-len "$max_seq_len" \
         --reps "$BENCH_REPS" --warmup-reps "$WARMUP_REPS" --ignore-eos --quiet 2>&1 \
     | grep -E '^\s+\[timed\]' \
     | awk -F'prefill_ms=' '{print $2}' | awk -F',' '{print $1}' \
@@ -83,16 +101,16 @@ run_one() {
 }
 
 for PP in "${PP_VALUES[@]}"; do
-    for MODE in causal gqa; do
+    for MODE in "${PREFILL_MODES[@]}"; do
         if [[ "$MODE" == "gqa" ]]; then
             GQA=1
             LABEL="fmha_prefill_gqa   (head-grouped, GROUP=4, M_EFF=BM*4)"
             # GQA uses smaller BM because the effective tile is BM*GROUP rows.
-            BM_VALUES=(4 8 16 32)
+            BM_VALUES=("${GQA_BM_VALUES[@]}")
         else
             GQA=0
             LABEL="fmha_prefill_causal"
-            BM_VALUES=(16 32 64 128)
+            BM_VALUES=("${CAUSAL_BM_VALUES[@]}")
         fi
 
         echo "=== $LABEL   pp=$PP   (prefill_ms median; '-' = BM > pp, skipped) ==="

@@ -30,6 +30,13 @@ BENCH_ENVS_DIR="${BENCH_ENVS_DIR:-$GROUT_DIR/../bench_envs}"
 BENCH_CACHE_DIR="${BENCH_CACHE_DIR:-$BENCH_ENVS_DIR/.cache}"
 BENCH_HOME="${BENCH_HOME:-${SCRATCH:-$GROUT_DIR/..}}"
 export HOME="$BENCH_HOME"
+# Repointing HOME breaks rustup's toolchain lookup ($HOME/.rustup), which
+# silently fails the cargo build and lets the sweep run a STALE binary —
+# fatal with the ../cutile-rs path dependency. Keep rustup/cargo anchored
+# to the real home.
+REAL_HOME="$(getent passwd "$(id -u)" | cut -d: -f6)"
+export RUSTUP_HOME="${RUSTUP_HOME:-$REAL_HOME/.rustup}"
+export CARGO_HOME="${CARGO_HOME:-$REAL_HOME/.cargo}"
 export PATH="$BENCH_ENVS_DIR/sglang_env/bin:$BENCH_ENVS_DIR/vllm_env/bin:$PATH"
 BENCH_REPS="${BENCH_REPS:-10}"
 WARMUP_REPS="${WARMUP_REPS:-3}"
@@ -81,18 +88,23 @@ echo "Using prompt file: $PROMPT_FILE  (pp≈${PP_LEN})"
 echo
 
 echo "Building grout…"
-(cd "$GROUT_DIR" && cargo build --release --features benchmarks --bin grout_bench 2>&1 | tail -2)
+(cd "$GROUT_DIR" && cargo build --release --features benchmarks --bin grout_bench 2>&1 | tail -2) \
+    || { echo "FATAL: grout_bench build failed — refusing to sweep a stale binary." >&2; exit 1; }
 echo
 
 # Per-cell runner: returns decode_ms median from the 10 timed reps.
 run_one() {
     local tg="$1" bn="$2" nks="$3"
+    local max_seq_len=$((PP_LEN + tg))
+    (( max_seq_len < 4096 )) && max_seq_len=4096
     GROUT_ATTN_BN_DECODE="$bn" \
         GROUT_FMHA_NUM_KV_SPLITS="$nks" \
         "$GROUT_DIR/target/release/grout_bench" \
         --model "$MODEL_HF" \
         --prompt-file "$PROMPT_FILE" \
+        --raw-prompt \
         --max-new-tokens "$tg" \
+        --max-seq-len "$max_seq_len" \
         --reps "$BENCH_REPS" --warmup-reps "$WARMUP_REPS" --ignore-eos --quiet 2>&1 \
     | grep -E '^\s+\[timed\]' \
     | awk -F'decode_ms=' '{print $2}' | awk -F',' '{print $1}' \

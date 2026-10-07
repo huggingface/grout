@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use cuda_async::device_operation::DeviceOp;
+use cutile::cuda_async::device_operation::DeviceOp;
 use cutile::api;
 use cutile::core::f16;
 use cutile::tensor::{Reshape, Tensor};
@@ -87,7 +87,7 @@ impl WeightLoader {
     pub fn load_device_f16(
         &self,
         name: &str,
-        stream: &Arc<cuda_core::Stream>,
+        stream: &Arc<cutile::cuda_core::Stream>,
     ) -> Result<Arc<Tensor<f16>>> {
         let host = self.load_host_f16(name)?;
         let shape = host.shape.clone();
